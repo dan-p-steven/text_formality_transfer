@@ -1,14 +1,17 @@
-from torchtext.transforms import Sequential, VocabTransform, ToTensor, Truncate, PadTransform
-from torchtext.data.utils import get_tokenizer
+from torchtext.transforms import Sequential, VocabTransform, ToTensor, AddToken
 from torchtext.vocab import build_vocab_from_iterator
+
+import torchtext.transforms as transforms
 
 import spacy
 import torch
 
+# Load spacy tokenizer
 NLP = spacy.load('en_core_web_sm')
 
+# List of special tokens
 SPECIAL_TOKS = ["<unk>", "<pad>", "<sos>", "<eos>"]
-
+    
 def _tokenize(text):
     return [token.text for token in NLP(text)]
 
@@ -25,9 +28,10 @@ def _yield_tokens(data):
 
         yield _tokenize(line)
 
+
 def _generate_vocab(data, vocab_save_path=None):
 
-    vocab = build_vocab_from_iterator(_yield_tokens(data), specials=SPECIAL_TOKS)
+    vocab = build_vocab_from_iterator(_yield_tokens(data), specials=SPECIAL_TOKS, min_freq=2)
 
     vocab.set_default_index(vocab["<unk>"])
 
@@ -36,12 +40,13 @@ def _generate_vocab(data, vocab_save_path=None):
     else: 
         return vocab
 
+def get_transform(vocab):
 
+    transform = Sequential(
+        VocabTransform(vocab=vocab),
+        AddToken(vocab["<sos>"], begin=True),
+        AddToken(vocab["<eos>"], begin=False),
+        ToTensor(padding_value=vocab["<pad>"])
+    )
 
-
-
-    
-
-
-def _generate_target_vocab():
-    pass
+    return transform

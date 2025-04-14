@@ -1,11 +1,19 @@
 from src.datasets import FormalityDataset
-from src.vocab import _generate_vocab
+from src.vocab import _generate_vocab, _tokenize, get_transform
+import torch
+import torchtext.transforms as T
 
 SRC_PATH = './data/train.src'
 TGT_PATH = './data/train.tgt'
 
 SRC_VOCAB_PATH = './models/src_vocab.pth'
 TGT_VOCAB_PATH = './models/tgt_vocab.pth'
+
+SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
+TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
+
+
+
 
 def main():
 
@@ -15,16 +23,9 @@ def main():
 
 if __name__ == "__main__":
 
-    # Read source sentences
-    with open(SRC_PATH, 'r', encoding='utf-8') as f:
-        src = [line.strip() for line in f]
+    src_transform = get_transform(SRC_VOCAB)
+    sentence = 'Yo wuss good this is a sentence.'
+    transformed_sentence = src_transform(_tokenize(sentence))
 
-    print (f'[source vocab]')
-    _generate_vocab(src, vocab_save_path=SRC_VOCAB_PATH)
 
-    with open(TGT_PATH, 'r', encoding='utf-8') as f:
-        tgt = [line.strip() for line in f]
-
-    print (f'[target vocab]')
-    _generate_vocab(tgt, vocab_save_path=TGT_VOCAB_PATH)
 
