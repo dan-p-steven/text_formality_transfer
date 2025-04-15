@@ -10,6 +10,7 @@ import torch.optim as optim
 import gc
 
 from random import randrange
+import matplotlib.pyplot as plt
 
 import time
 
@@ -424,16 +425,16 @@ if __name__ == "__main__":
     # Define loss function, tell it to ignore the <pad> index when calculating loss
     criterion = nn.CrossEntropyLoss(ignore_index=TGT_VOCAB["<pad>"])
 
-    # Prepare training data
-    train_dataset = FormalityDataset(TRAIN_SRC_PATH, TRAIN_TGT_PATH)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn)
+    # # Prepare training data
+    # train_dataset = FormalityDataset(TRAIN_SRC_PATH, TRAIN_TGT_PATH)
+    # train_loader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn)
 
-    val_dataset = FormalityDataset(VAL_SRC_PATH, VAL_TGT_PATH)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
+    # val_dataset = FormalityDataset(VAL_SRC_PATH, VAL_TGT_PATH)
+    # val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
     
-    gc.collect()
-    torch.cuda.empty_cache()
-    train(model, train_loader, num_epochs, optimizer, criterion)
+    # gc.collect()
+    # torch.cuda.empty_cache()
+    # train(model, train_loader, num_epochs, optimizer, criterion)
 
 # '''
 # TODO: 
@@ -443,6 +444,25 @@ if __name__ == "__main__":
 #         * loss
 #         * perplexity
 # '''
+    model, optimizer, epoch, metrics = load_checkpoint(model, optimizer, './models/checkpoints/model_epoch_25.pt')
+    print (metrics['bleu_scores'])
+    print (metrics['train_losses'])
+    print (metrics['val_losses'])
 
-   #model, optimizer, epoch, metrics = load_checkpoint(model, optimizer, './models/checkpoints/model_epoch_15.pt')
-    #print (metrics['bleu_scores'])
+    print (metrics['rouge1_scores'])
+    print (metrics['rouge2_scores'])
+
+    plt_epochs = range(1, len(metrics['train_losses']) + 1)
+
+    plt.plot(plt_epochs, metrics['rouge1_scores'], color='red', label='Rouge 1')
+    plt.plot(plt_epochs, metrics['rouge2_scores'], color='magenta', label='Rouge 2')
+    plt.plot(plt_epochs, metrics['rougeL_scores'], color='orange', label='Rouge L')
+
+    
+
+    plt.xlabel('Epoch')
+    plt.ylabel('Rouge Scores')
+    plt.title('Comparison of Rouge Scores Over Epochs')
+    plt.grid(True)
+    plt.legend()
+    plt.savefig('rouge_scores.png')
