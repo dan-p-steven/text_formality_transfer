@@ -8,14 +8,28 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from random import randrange
+
+import time
+
 SRC_PATH = './data/train.src'
 TGT_PATH = './data/train.tgt'
+
+VAL_SRC_PATH = './data/valid.src'
+VAL_TGT_PATH = './data/valid.tgt'
 
 SRC_VOCAB_PATH = './models/src_vocab.pth'
 TGT_VOCAB_PATH = './models/tgt_vocab.pth'
 
 SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
 TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
+
+import warnings
+warnings.filterwarnings(
+    "ignore", 
+    message="The inner type of a container is lost when calling torch.jit.isinstance in eager mode.*",
+    category=UserWarning
+)
 
 def collate_fn(batch):
     src_batch, tgt_batch = zip(*batch)
@@ -36,7 +50,96 @@ def collate_fn(batch):
     
     return src_padded, tgt_padded
 
+def val_collate_fn(batch):
 
+    src_batch, tgt_batch = zip(*batch)
+    
+    # Get the data transforms
+    src_transform = get_transform(SRC_VOCAB)
+    tgt_transform = get_transform(TGT_VOCAB)
+
+    src_tensors = [src_transform(_tokenize(x)) for x in src_batch]
+
+    tgt_tensors = []
+
+    # get a random variant from translations
+    for translations in tgt_batch:
+        # generate a random index from 1 to len translations
+        idx = randrange(len(translations))
+        # pick that translation
+        x = translations[idx]
+        # transform it and add it to the tensor
+        tgt_tensors.append(tgt_transform(_tokenize(x)))
+
+    src_padded = pad_sequence(src_tensors, batch_first=True, padding_value=SRC_VOCAB['<pad>'])
+    tgt_padded = pad_sequence(tgt_tensors, batch_first=True, padding_value=TGT_VOCAB['<pad>'])
+
+    src_padded = src_padded.transpose(0, 1)
+    tgt_padded = tgt_padded.transpose(0, 1)
+
+    return src_padded, tgt_padded
+
+def evaluate(model, loader, criterion):
+
+    model.eval()
+    epoch_loss = 0
+
+    with torch.no_grad():
+        for b, batch in enumerate(loader):
+            src, tgt = batch
+            output = model(src, tgt, 0)
+
+            output = output[1:].reshape(-1, output.shape[2])
+            tgt = tgt[1:].reshape(-1)
+
+            # Calculate loss
+            loss = criterion(output, tgt)
+            epoch_loss += loss.item()
+    return epoch_loss/len(loader)
+
+def train(model, loader, num_epochs, optimizer, criterion):
+    train_losses = []
+    val_losses = []
+
+    for epoch in range(num_epochs):
+
+        model.train()
+        epoch_loss = 0
+
+        print (f'\nEpoch [{epoch+1}/{num_epochs}]')
+        for b, batch in enumerate(loader):
+            src, tgt = batch
+
+            start = time.time()
+            
+            output = model(src, tgt)
+        
+            # Ignore the <sos> token
+            output = output[1:].reshape(-1, output.shape[2])
+            tgt = tgt[1:].reshape(-1)
+
+            optimizer.zero_grad()
+            loss = criterion(output, tgt)
+
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
+            optimizer.step()
+            epoch_loss += loss.item()
+            end = time.time()
+            print (f'\r\tbatch {b+1}/{len(loader)}: {end-start:.2f}s', end='', flush=True)
+
+        train_losses.append(epoch_loss/len(loader))
+        val_losses.append(evaluate(model, val_loader, criterion))
+
+    print (f'\n{train_losses} {val_losses}')
+
+        # x Do model evaluation
+        # x val loader
+        #  x src, tgt
+        #  generate predictions with this current model on val 
+        #  compare predictions with tgt (calculate bleu, rouge perplexity)
+        # save 
 
 
 def main():
@@ -47,7 +150,7 @@ def main():
 if __name__ == "__main__":
 
     # Training hyperparameters
-    num_epochs = 1
+    num_epochs = 10
     learning_rate = 0.001
     batch_size = 64
 
@@ -97,27 +200,26 @@ if __name__ == "__main__":
 
     # Prepare training data
     train_dataset = FormalityDataset(SRC_PATH, TGT_PATH)
-    train_loader = DataLoader(train_dataset, batch_size=64, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn)
 
-    for epoch in range(num_epochs):
+    val_dataset = FormalityDataset(VAL_SRC_PATH, VAL_TGT_PATH)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
 
-        print (f'Epoch [{epoch+1}/{num_epochs}]')
-        # Training loop?
-        for b, (src, tgt) in enumerate(train_loader):
+    train(model, train_loader, num_epochs, optimizer, criterion)
 
-            print (f'\t\rbatch {b}/', end='', flush=True)
-            output = model(src, tgt)
 
-            output_dim = output.shape[-1]
-            
-            # Ignore the <sos> token
-            output = output[1:].reshape(-1, output.shape[2])
-            tgt = tgt[1:].reshape(-1)
 
-            optimizer.zero_grad()
-            loss = criterion(output, tgt)
+ 
 
-            loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
-            optimizer.step()
+
+'''
+TODO: 
+    * add model checkpointing during training
+    * move model, src, tgt tensors to gpu
+    * track certain metrics during training and validation
+        * bleu score
+        * rouge score
+        * loss
+        * perplexity
+'''
