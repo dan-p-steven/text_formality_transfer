@@ -12,8 +12,8 @@ from random import randrange
 
 import time
 
-SRC_PATH = './data/train.src'
-TGT_PATH = './data/train.tgt'
+TRAIN_SRC_PATH = './data/train.src.bak'
+TRAIN_TGT_PATH = './data/train.tgt.bak'
 
 VAL_SRC_PATH = './data/valid.src'
 VAL_TGT_PATH = './data/valid.tgt'
@@ -21,8 +21,8 @@ VAL_TGT_PATH = './data/valid.tgt'
 SRC_VOCAB_PATH = './models/src_vocab.pth'
 TGT_VOCAB_PATH = './models/tgt_vocab.pth'
 
-SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
-TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
+#SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
+#TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
 
 import warnings
 warnings.filterwarnings(
@@ -30,6 +30,10 @@ warnings.filterwarnings(
     message="The inner type of a container is lost when calling torch.jit.isinstance in eager mode.*",
     category=UserWarning
 )
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+
 
 def collate_fn(batch):
     src_batch, tgt_batch = zip(*batch)
@@ -87,6 +91,10 @@ def evaluate(model, loader, criterion):
     with torch.no_grad():
         for b, batch in enumerate(loader):
             src, tgt = batch
+
+            src = src.to(device)
+            tgt = tgt.to(device)
+
             output = model(src, tgt, 0)
 
             output = output[1:].reshape(-1, output.shape[2])
@@ -109,6 +117,10 @@ def train(model, loader, num_epochs, optimizer, criterion):
         print (f'\nEpoch [{epoch+1}/{num_epochs}]')
         for b, batch in enumerate(loader):
             src, tgt = batch
+
+            # move to gpu
+            src = src.to(device)
+            tgt = tgt.to(device)
 
             start = time.time()
             
@@ -149,63 +161,72 @@ def main():
 
 if __name__ == "__main__":
 
-    # Training hyperparameters
-    num_epochs = 10
-    learning_rate = 0.001
-    batch_size = 64
+    with open(TRAIN_SRC_PATH, 'r', encoding='utf-8') as f:
+        src = [line.strip() for line in f]
 
-    # Model Hyperparameters
-    input_size_encoder = len(SRC_VOCAB)
-    input_size_decoder = len(TGT_VOCAB)
+    with open(TRAIN_TGT_PATH, 'r', encoding='utf-8') as f:
+        tgt = [line.strip() for line in f]
 
-    output_size = len(TGT_VOCAB)
-    encoder_embedding_size = 128
-    decoder_embedding_size = 128
+    _generate_vocab(src, SRC_VOCAB_PATH)
+    _generate_vocab(tgt, TGT_VOCAB_PATH)
 
-    hidden_size = 1024
-    num_layers = 2
-    enc_dropout = 0.5
-    dec_dropout = 0.5
+#     # Training hyperparameters
+#     num_epochs = 10
+#     learning_rate = 0.001
+#     batch_size = 64
+
+#     # Model Hyperparameters
+#     input_size_encoder = len(SRC_VOCAB)
+#     input_size_decoder = len(TGT_VOCAB)
+
+#     output_size = len(TGT_VOCAB)
+#     encoder_embedding_size = 128
+#     decoder_embedding_size = 128
+
+#     hidden_size = 1024
+#     num_layers = 2
+#     enc_dropout = 0.5
+#     dec_dropout = 0.5
 
 
 
-    # Instantiate encoder
-    encoder = Encoder(
-        input_size=input_size_encoder,
-        embedding_size=encoder_embedding_size,
-        hidden_size=hidden_size,
-        num_layers=num_layers,
-        dropout_p=enc_dropout
-    )
+#     # Instantiate encoder
+#     encoder = Encoder(
+#         input_size=input_size_encoder,
+#         embedding_size=encoder_embedding_size,
+#         hidden_size=hidden_size,
+#         num_layers=num_layers,
+#         dropout_p=enc_dropout
+#     )
     
-    # Instantiate decoder
-    decoder = Decoder(
-        input_size=input_size_decoder,
-        embedding_size=decoder_embedding_size,
-        hidden_size=hidden_size,
-        output_size=output_size,
-        num_layers=num_layers,
-        dropout_p=dec_dropout
-    )
+#     # Instantiate decoder
+#     decoder = Decoder(
+#         input_size=input_size_decoder,
+#         embedding_size=decoder_embedding_size,
+#         hidden_size=hidden_size,
+#         output_size=output_size,
+#         num_layers=num_layers,
+#         dropout_p=dec_dropout
+#     )
 
-    # Create seq2seq model
-    model = Seq2Seq(encoder=encoder,
-                    decoder=decoder)
+#     # Create seq2seq model
+#     model = Seq2Seq(encoder=encoder,
+#                     decoder=decoder).to(device)
     
-    # Define optimizer
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+#     # Define optimizer
+#     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
-    # Define loss function, tell it to ignore the <pad> index when calculating loss
-    criterion = nn.CrossEntropyLoss(ignore_index=TGT_VOCAB["<pad>"])
+#     # Define loss function, tell it to ignore the <pad> index when calculating loss
+#     criterion = nn.CrossEntropyLoss(ignore_index=TGT_VOCAB["<pad>"])
 
-    # Prepare training data
-    train_dataset = FormalityDataset(SRC_PATH, TGT_PATH)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn)
+#     # Prepare training data
+#     train_dataset = FormalityDataset(TRAIN_SRC_PATH, TRAIN_TGT_PATH)
+#     train_loader = DataLoader(train_dataset, batch_size=batch_size, collate_fn=collate_fn)
 
-    val_dataset = FormalityDataset(VAL_SRC_PATH, VAL_TGT_PATH)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
+#     val_dataset = FormalityDataset(VAL_SRC_PATH, VAL_TGT_PATH)
+#     val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
 
-    train(model, train_loader, num_epochs, optimizer, criterion)
+#     train(model, train_loader, num_epochs, optimizer, criterion)
 
 
 
@@ -213,13 +234,13 @@ if __name__ == "__main__":
 
 
 
-'''
-TODO: 
-    * add model checkpointing during training
-    * move model, src, tgt tensors to gpu
-    * track certain metrics during training and validation
-        * bleu score
-        * rouge score
-        * loss
-        * perplexity
-'''
+# '''
+# TODO: 
+#     * add model checkpointing during training
+#     * move model, src, tgt tensors to gpu
+#     * track certain metrics during training and validation
+#         * bleu score
+#         * rouge score
+#         * loss
+#         * perplexity
+# '''
