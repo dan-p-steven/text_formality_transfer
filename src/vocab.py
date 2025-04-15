@@ -29,9 +29,12 @@ def _yield_tokens(data):
         yield _tokenize(line)
 
 
-def _generate_vocab(data, vocab_save_path=None):
+def _generate_vocab(data, vocab_save_path=None, token_limit=5000):
 
-    vocab = build_vocab_from_iterator(_yield_tokens(data), specials=SPECIAL_TOKS, min_freq=2)
+    vocab = build_vocab_from_iterator(_yield_tokens(data), 
+                                      specials=SPECIAL_TOKS, 
+                                      min_freq=2,
+                                      max_tokens=token_limit)
 
     vocab.set_default_index(vocab["<unk>"])
 
