@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import random
 
+SRC_VOCAB_PATH = './models/src_vocab.pth'
+TGT_VOCAB_PATH = './models/tgt_vocab.pth'
+
+SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
+TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
+
 class Encoder(nn.Module):
     def __init__(self, input_size, embedding_size, hidden_size, num_layers, dropout_p=0.1):
         super(Encoder, self).__init__()
@@ -20,9 +26,6 @@ class Encoder(nn.Module):
                           dropout=dropout_p if num_layers > 1 else 0)
         
         self.dropout = nn.Dropout(dropout_p)
-
-        
-            
         
     def forward(self, x):
 
@@ -70,3 +73,25 @@ class Seq2Seq(nn.Module):
         self.decoder = decoder
 
     def forward(self, source, target, teacher_force_ratio=0.5):
+        batch_size = source.shape[1]
+        target_len = target.shape[0]
+
+        target_vocab_size = len(TGT_VOCAB)
+
+        outputs = torch.zeros(target_len, batch_size, target_vocab_size)
+
+        hidden, cell = self.encoder(source)
+         
+        # Grab start token
+        x = target[0]
+
+        for t in range(1, target_len):
+            output, hidden, cell = self.decoder(x, hidden, cell)
+            outputs[t] = output
+
+            # (N, tgt vocab size)
+            best_guess = output.argmax(1)
+
+            x = target[t] if random.random() < teacher_force_ratio else best_guess
+
+        return outputs

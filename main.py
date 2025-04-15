@@ -1,5 +1,6 @@
 from src.datasets import FormalityDataset
 from src.vocab import _generate_vocab, _tokenize, get_transform
+from src.model import Encoder, Decoder, Seq2Seq
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 
@@ -39,19 +40,56 @@ def collate_fn(batch):
 
 
 def main():
-
     formality_dataset = FormalityDataset(SRC_PATH, TGT_PATH)
     print (len(formality_dataset))
 
 
 if __name__ == "__main__":
 
+    # Training hyperparameters
+    num_epochs = 20
+    learning_rate = 0.001
+    batch_size = 64
+
+    # Model Hyperparameters
+    input_size_encoder = len(SRC_VOCAB)
+    input_size_decoder = len(TGT_VOCAB)
+
+    output_size = len(TGT_VOCAB)
+    encoder_embedding_size = 128
+    decoder_embedding_size = 128
+
+    hidden_size = 1024
+    num_layers = 2
+    enc_dropout = 0.5
+    dec_dropout = 0.5
+
+
+    # Instantiate encoder
+    encoder = Encoder(
+        input_size=input_size_encoder,
+        embedding_size=encoder_embedding_size,
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        dropout_p=enc_dropout
+    )
+    
+    # Instantiate decoder
+    decoder = Decoder(
+        input_size=input_size_decoder,
+        embedding_size=decoder_embedding_size,
+        hidden_size=hidden_size,
+        output_size=output_size,
+        num_layers=num_layers,
+        dropout_p=dec_dropout
+    )
+
+    # Create seq2seq model
+    formality_model = Seq2Seq(encoder=encoder,
+                              decoder=decoder)
+    
+    # Prepare training data
     train_dataset = FormalityDataset(SRC_PATH, TGT_PATH)
     train_loader = DataLoader(train_dataset, batch_size=64, collate_fn=collate_fn)
 
-    for b, (src, tgt) in enumerate(train_loader):
-        print(f"Batch {b + 1}")
-        print("SRC shape:", src.shape)
-        print("SRC tensor:\n", src)
-        print("TGT shape:", tgt.shape)
-        print("TGT tensor:\n", tgt)
+    # Training loop? 
