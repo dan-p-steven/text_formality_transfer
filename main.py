@@ -12,11 +12,11 @@ from random import randrange
 
 import time
 
-TRAIN_SRC_PATH = './data/train.src.bak'
-TRAIN_TGT_PATH = './data/train.tgt.bak'
+TRAIN_SRC_PATH = './data/train.src'
+TRAIN_TGT_PATH = './data/train.tgt'
 
-VAL_SRC_PATH = './data/valid.src.bak'
-VAL_TGT_PATH = './data/valid.tgt.bak'
+VAL_SRC_PATH = './data/valid.src'
+VAL_TGT_PATH = './data/valid.tgt'
 
 SRC_VOCAB_PATH = './models/src_vocab.pth'
 TGT_VOCAB_PATH = './models/tgt_vocab.pth'
@@ -108,6 +108,7 @@ def evaluate(model, loader, criterion):
 def train(model, loader, num_epochs, optimizer, criterion):
     train_losses = []
     val_losses = []
+    best_val_loss = float('inf')
 
     for epoch in range(num_epochs):
 
@@ -144,7 +145,31 @@ def train(model, loader, num_epochs, optimizer, criterion):
         train_losses.append(epoch_loss/len(loader))
         val_losses.append(evaluate(model, val_loader, criterion))
 
-    print (f'\n{train_losses} {val_losses}')
+        # Model Checkpoint
+        checkpoint_path = f'./models/checkpoints/model_epoch_{epoch+1}.pt'
+        torch.save({
+            'epoch': epoch + 1,
+            'model': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'train_losses': train_losses,
+            'val_losses': val_losses
+        }, checkpoint_path)
+        print(f'\tSaved checkpoint: {checkpoint_path}')
+
+        # Save best model
+        if val_losses[-1] < best_val_loss:
+            best_path = './models/best.pt'
+            best_val_loss = val_losses[-1]
+            torch.save({
+                'epoch': epoch + 1,
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'train_losses': train_losses,
+                'val_losses': val_losses
+            }, best_path)
+            print (f'New best model (loss={best_val_loss:.3f}) saved to {best_path}.')
+
+
 
         # x Do model evaluation
         # x val loader
@@ -153,10 +178,6 @@ def train(model, loader, num_epochs, optimizer, criterion):
         #  compare predictions with tgt (calculate bleu, rouge perplexity)
         # save 
 
-
-def main():
-    formality_dataset = FormalityDataset(SRC_PATH, TGT_PATH)
-    print (len(formality_dataset))
 
 
 if __name__ == "__main__":
@@ -212,7 +233,8 @@ if __name__ == "__main__":
 
     # Create seq2seq model
     model = Seq2Seq(encoder=encoder,
-                    decoder=decoder).to(device)
+                    decoder=decoder)
+    model.to(device)
     
     # Define optimizer
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -228,12 +250,6 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=val_collate_fn)
 
     train(model, train_loader, num_epochs, optimizer, criterion)
-
-
-
- 
-
-
 
 '''
 TODO: 

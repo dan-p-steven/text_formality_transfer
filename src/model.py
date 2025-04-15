@@ -9,6 +9,8 @@ TGT_VOCAB_PATH = './models/tgt_vocab.pth'
 SRC_VOCAB = torch.load(SRC_VOCAB_PATH)
 TGT_VOCAB = torch.load(TGT_VOCAB_PATH)
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class Encoder(nn.Module):
     def __init__(self, input_size, embedding_size, hidden_size, num_layers, dropout_p=0.1):
         super(Encoder, self).__init__()
@@ -71,6 +73,7 @@ class Seq2Seq(nn.Module):
         super(Seq2Seq, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
+        self.device = device
 
     def forward(self, source, target, teacher_force_ratio=0.5):
         batch_size = source.shape[1]
@@ -78,7 +81,7 @@ class Seq2Seq(nn.Module):
 
         target_vocab_size = len(TGT_VOCAB)
 
-        outputs = torch.zeros(target_len, batch_size, target_vocab_size)
+        outputs = torch.zeros(target_len, batch_size, target_vocab_size, device=self.device)
 
         hidden, cell = self.encoder(source)
          
