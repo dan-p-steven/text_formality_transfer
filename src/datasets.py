@@ -1,7 +1,4 @@
-from torchtext.transforms import Sequential, VocabTransform, ToTensor, Truncate, PadTransform
-#from torchtext.data.utils import get_tokenizer
-#from torchtext.vocab import build_vocab_from_iterator
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 
 class FormalityDataset(Dataset):
@@ -23,3 +20,6 @@ class FormalityDataset(Dataset):
 
     def __len__(self):
         return len(self.src)
+    
+    def __getitem__(self, idx):
+        return self.src[idx], self.tgt[idx]
